@@ -26,8 +26,16 @@ from options.train_options import TrainOptions
 from data import create_dataset
 from models import create_model
 from util.visualizer import Visualizer
+import sys
 
 if __name__ == '__main__':
+
+    print("Usage:\n{0}\n".format(" ".join([x for x in sys.argv])))
+    print("All settings used:")
+    for k,v in sorted(vars(sys.argv).items()):
+        print("{0}: {1}".format(k,v))
+
+
     opt = TrainOptions().parse()   # get training options
     dataset = create_dataset(opt)  # create a dataset given opt.dataset_mode and other options
     dataset_size = len(dataset)    # get the number of images in the dataset.
