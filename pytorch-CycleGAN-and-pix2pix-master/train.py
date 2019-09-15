@@ -28,6 +28,7 @@ from models import create_model
 from util.visualizer import Visualizer
 import sys
 
+<<<<<<< HEAD
 if __name__ == '__main__':
 
     print("Usage:\n{0}\n".format(" ".join([x for x in sys.argv])))
@@ -36,6 +37,9 @@ if __name__ == '__main__':
         print("{0}: {1}".format(k,v))
 
 
+=======
+if __name__ == '__main__':        
+>>>>>>> 9fd2079a4a6b0b50ddb7ccfa24d06ce15ec2c0b7
     opt = TrainOptions().parse()   # get training options
     dataset = create_dataset(opt)  # create a dataset given opt.dataset_mode and other options
     dataset_size = len(dataset)    # get the number of images in the dataset.
