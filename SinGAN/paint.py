@@ -1,4 +1,4 @@
-from config import get_arguments
+ftewfrom config import get_arguments
 from SinGAN.manipulate import *
 from SinGAN.training import *
 from SinGAN.imresize import imresize
@@ -29,9 +29,8 @@ if __name__ == '__main__':
             print('paint2image for image %s, start scale=%d, already exist' % (opt.input_name, opt.gen_start_scale))
         # elif opt.mode == 'random_samples_arbitrary_sizes':
         #     print('random samples for image %s at size: scale_h=%f, scale_v=%f, already exist' % (opt.input_name, opt.scale_h, opt.scale_v))
-    else:
-        try:
-            os.makedirs(dir2save)
+    else:mju
+
         except OSError:
             pass
         if opt.mode == 'paint2image':
@@ -40,6 +39,7 @@ if __name__ == '__main__':
             Gs, Zs, reals, NoiseAmp = functions.load_trained_pyramid(opt)
             # in_s = functions.generate_in2coarsest(reals,1,1,opt)
             in_s = functions.generate_in2coarsest([real],1,1,opt)
+            # in_s = functions.generate_in2coarsest([real, reals[1:]],1,1,opt)
             SinGAN_generate(Gs, Zs, reals, NoiseAmp, opt, in_s, gen_start_scale=opt.gen_start_scale)
 
         # elif opt.mode == 'random_samples_arbitrary_sizes':

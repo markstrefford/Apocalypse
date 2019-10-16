@@ -165,7 +165,7 @@ def SinGAN_SR(opt,Gs,Zs,reals,NoiseAmp):
     reals_sr = []
     NoiseAmp_sr = []
     Gs_sr = []
-    real = reals[-1]#read_image(opt)
+    real = reals[-1] #read_image(opt)
     for j in range(1,iter_num+1,1):
         real_ = imresize(real,pow(1/opt.scale_factor,j),opt)
         real_ = real_[:, :, 0:int(pow(1 / opt.scale_factor, j) * real.shape[2]),0:int(pow(1 / opt.scale_factor, j) * real.shape[3])]
