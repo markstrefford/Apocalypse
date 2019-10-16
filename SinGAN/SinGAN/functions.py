@@ -226,7 +226,8 @@ def load_trained_pyramid(opt, mode_='train'):
     #dir = 'TrainedModels/%s/scale_factor=%f' % (opt.input_name[:-4], opt.scale_factor_init)
     mode = opt.mode
     opt.mode = 'train'
-    if (mode == 'animation_train') | (mode == 'SR_train') | (mode == 'paint_train'):
+    # if (mode == 'animation_train') | (mode == 'SR_train') | (mode == 'paint_train'):
+    if (mode == 'animation_train') | (mode == 'SR_train') | (mode == 'paint2image'):
         opt.mode = mode
     dir = generate_dir2save(opt)
     if(os.path.exists(dir)):
