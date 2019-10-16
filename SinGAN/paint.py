@@ -1,8 +1,9 @@
-ftewfrom config import get_arguments
+from config import get_arguments
 from SinGAN.manipulate import *
 from SinGAN.training import *
 from SinGAN.imresize import imresize
 import SinGAN.functions as functions
+import os
 
 
 if __name__ == '__main__':
@@ -29,8 +30,9 @@ if __name__ == '__main__':
             print('paint2image for image %s, start scale=%d, already exist' % (opt.input_name, opt.gen_start_scale))
         # elif opt.mode == 'random_samples_arbitrary_sizes':
         #     print('random samples for image %s at size: scale_h=%f, scale_v=%f, already exist' % (opt.input_name, opt.scale_h, opt.scale_v))
-    else:mju
-
+    else:
+        try:
+            os.makedirs(dir2save)
         except OSError:
             pass
         if opt.mode == 'paint2image':
