@@ -157,7 +157,6 @@ def calc_gradient_penalty(netD, real_data, fake_data, LAMBDA):
     return gradient_penalty
 
 def read_image(opt):
-    print('read_image({}/{})'.format(opt.input_dir, opt.input_name))
     x = img.imread('%s/%s' % (opt.input_dir,opt.input_name))
     x = np2torch(x,opt)
     x = x[:,0:3,:,:]
@@ -213,6 +212,20 @@ def adjust_scales2image(real_,opt):
     opt.stop_scale = opt.num_scales - scale2stop
     return real
 
+def adjust_scales2image_SR(real_,opt):
+    #'''
+    opt.min_size = 18
+    opt.num_scales = int((math.log(math.pow(opt.min_size / (min([real_.shape[2],real_.shape[3]])), 1), opt.scale_factor_init))) + 1
+    scale2stop = int(math.log(min([opt.max_size, max([real_.shape[2], real_.shape[3]])]) / max([real_.shape[2], real_.shape[3]]),opt.scale_factor_init))
+    opt.stop_scale = opt.num_scales - scale2stop
+    opt.scale1 = min(opt.max_size / max([real_.shape[2], real_.shape[3]]),1)  # min(250/max([real_.shape[0],real_.shape[1]]),1)
+    real = imresize(real_, opt.scale1, opt)
+    opt.scale_factor = math.pow(opt.min_size / (min([real_.shape[2],real_.shape[3]])), 1 / (opt.stop_scale))
+    # opt.scale_factor = math.pow(opt.min_size/(min(real_.shape[0],real_.shape[1])),1/(opt.stop_scale))
+    scale2stop = int(math.log(min([opt.max_size, max([real_.shape[2], real_.shape[3]])]) / max([real_.shape[2], real_.shape[3]]),opt.scale_factor_init))
+    opt.stop_scale = opt.num_scales - scale2stop
+    return real
+
 def creat_reals_pyramid(real,reals,opt):
     real = real[:,0:3,:,:]
     for i in range(0,opt.stop_scale+1,1):
@@ -226,8 +239,7 @@ def load_trained_pyramid(opt, mode_='train'):
     #dir = 'TrainedModels/%s/scale_factor=%f' % (opt.input_name[:-4], opt.scale_factor_init)
     mode = opt.mode
     opt.mode = 'train'
-    # if (mode == 'animation_train') | (mode == 'SR_train') | (mode == 'paint_train'):
-    if (mode == 'animation_train') | (mode == 'SR_train') | (mode == 'paint2image'):
+    if (mode == 'animation_train') | (mode == 'SR_train') | (mode == 'paint_train'):
         opt.mode = mode
     dir = generate_dir2save(opt)
     if(os.path.exists(dir)):
@@ -264,16 +276,15 @@ def generate_dir2save(opt):
     elif opt.mode == 'animation':
         dir2save = '%s/Animation/%s' % (opt.out, opt.input_name[:-4])
     elif opt.mode == 'SR':
-        dir2save = '%s/SR/%s/SR_factor=%f' % (opt.out, opt.input_name[:-4], opt.sr_factor)
-    elif opt.mode == 'SR_multi':
-        dir2save = '%s/SR/BSD100_%d/%s' % (opt.out, opt.alpha, opt.input_name[:-4])
+        dir2save = '%s/SR/%s' % (opt.out, opt.sr_factor)
     elif opt.mode == 'harmonization':
-        dir2save = '%s/harmonization/%s/%s_out' % (opt.out, opt.input_name[:-4],opt.ref_name[:-4])
+        dir2save = '%s/Harmonization/%s/%s_out' % (opt.out, opt.input_name[:-4],opt.ref_name[:-4])
     elif opt.mode == 'editing':
-        dir2save = '%s/edit/%s/%s_out' % (opt.out, opt.input_name[:-4],opt.ref_name[:-4])
+        dir2save = '%s/Editing/%s/%s_out' % (opt.out, opt.input_name[:-4],opt.ref_name[:-4])
     elif opt.mode == 'paint2image':
-        dir2save = '%s/paint2image/%s/start_scale=%d/%s_out' % (opt.out, opt.input_name[:-4],opt.paint_start_scale,opt.paint_name[:-4])
-    print('dir2save()={}'.format(dir2save))
+        dir2save = '%s/Paint2image/%s/%s_out' % (opt.out, opt.input_name[:-4],opt.ref_name[:-4])
+        if opt.quantization_flag:
+            dir2save = '%s_quantized' % dir2save
     return dir2save
 
 def post_config(opt):
@@ -285,6 +296,8 @@ def post_config(opt):
     opt.min_nfc_init = opt.min_nfc
     opt.scale_factor_init = opt.scale_factor
     opt.out_ = 'TrainedModels/%s/scale_factor=%f/' % (opt.input_name[:-4], opt.scale_factor)
+    if opt.mode == 'SR':
+        opt.alpha = 100
 
     if opt.manualSeed is None:
         opt.manualSeed = random.randint(1, 10000)
@@ -296,14 +309,14 @@ def post_config(opt):
     return opt
 
 def calc_init_scale(opt):
-    in_scale = math.pow(1/2,1/6)
+    in_scale = math.pow(1/2,1/3)
     iter_num = round(math.log(1 / opt.sr_factor, in_scale))
     in_scale = pow(opt.sr_factor, 1 / iter_num)
     return in_scale,iter_num
 
 def quant(prev):
     arr = prev.reshape((-1, 3)).cpu()
-    kmeans = KMeans(n_clusters=3, random_state=0).fit(arr)
+    kmeans = KMeans(n_clusters=5, random_state=0).fit(arr)
     labels = kmeans.labels_
     centers = kmeans.cluster_centers_
     x = centers[labels]
@@ -315,7 +328,7 @@ def quant(prev):
 
 def quant2centers(paint, centers):
     arr = paint.reshape((-1, 3)).cpu()
-    kmeans = KMeans(n_clusters=3, init=centers, n_init=1).fit(arr)
+    kmeans = KMeans(n_clusters=5, init=centers, n_init=1).fit(arr)
     labels = kmeans.labels_
     #centers = kmeans.cluster_centers_
     x = centers[labels]
@@ -329,7 +342,10 @@ def quant2centers(paint, centers):
 
 
 def dilate_mask(mask,opt):
-    element = morphology.disk(radius=7)
+    if opt.mode == "harmonization":
+        element = morphology.disk(radius=7)
+    if opt.mode == "editing":
+        element = morphology.disk(radius=20)
     mask = torch2uint8(mask)
     mask = mask[:,:,0]
     mask = morphology.binary_dilation(mask,selem=element)
@@ -339,101 +355,8 @@ def dilate_mask(mask,opt):
     mask = np2torch(mask,opt)
     opt.nc_im = nc_im
     mask = mask.expand(1, 3, mask.shape[2], mask.shape[3])
+    plt.imsave('%s/%s_mask_dilated.png' % (opt.ref_dir, opt.ref_name[:-4]), convert_image_np(mask), vmin=0,vmax=1)
+    mask = (mask-mask.min())/(mask.max()-mask.min())
     return mask
 
 
-'''
-def calc_gradient_penalty_MS(netD, real_data, fake_data, LAMBDA):
-    #print real_data.size()
-    alpha = torch.rand(1, 1)
-    alpha = alpha.expand(real_data.size())
-    alpha = alpha.cuda() #gpu) #if use_cuda else alpha
-
-    interpolates = alpha * real_data + ((1 - alpha) * fake_data)
-
-
-    interpolates = interpolates.cuda()
-    interpolates = torch.autograd.Variable(interpolates, requires_grad=True)
-
-    disc_interpolates = netD(interpolates)
-
-    gradients = torch.autograd.grad(outputs=disc_interpolates, inputs=interpolates,
-                              grad_outputs=torch.ones(disc_interpolates.size()).cuda(), #if use_cuda else torch.ones(
-                                  #disc_interpolates.size()),
-                              create_graph=True, retain_graph=True, only_inputs=True)[0]
-    #LAMBDA = 5
-    gradient_penalty = ((gradients.norm(2, dim=1) - 1) ** 2).mean() * LAMBDA
-    return gradient_penalty
-
-def mean_equalizer(ref,target):
-    s_target = target.shape
-    mean_ref = np.mean(ref, axis=(0,1))
-    r_len = ref.ndim
-    t_len = target.ndim
-    if r_len == 2:
-       mean_ref = np.tile(mean_ref,s_target)
-    else:
-       mean_ref = np.tile(mean_ref,[s_target[0],s_target[1],1])
-    mean_target = np.mean(target, axis=(0,1))
-    if t_len == 2:
-       mean_target = np.tile(mean_target,s_target)
-    else:
-       mean_target = np.tile(mean_target,[s_target[0],s_target[1],1])
-    eq_target = target-mean_target+mean_ref
-    return eq_target
-
-
-#def save_mat(x,fold):
-#    x = x.cpu()
-#    x = x.numpy()
-#    adict = {}
-#    adict['x'] = x
-#    sio.savemat(fold, adict)
-
-#def load_mat(fold):
-#    mat = sio.loadmat(fold)
-#    return mat
-
-def hist_match(source, template):
-    """
-    Adjust the pixel values of a grayscale image such that its histogram
-    matches that of a target image
-
-    Arguments:
-    -----------
-        source: np.ndarray
-            Image to transform; the histogram is computed over the flattened
-            array
-        template: np.ndarray
-            Template image; can have different dimensions to source
-    Returns:
-    -----------
-        matched: np.ndarray
-            The transformed output image
-    """
-
-    oldshape = source.shape
-    #source = source.ravel()
-    #template = template.ravel()
-
-    # get the set of unique pixel values and their corresponding indices and
-    # counts
-    s_values, bin_idx, s_counts = np.unique(source, return_inverse=True,
-                                            return_counts=True)
-    t_values, t_counts = np.unique(template, return_counts=True)
-
-    # take the cumsum of the counts and normalize by the number of pixels to
-    # get the empirical cumulative distribution functions for the source and
-    # template images (maps pixel value --> quantile)
-    s_quantiles = np.cumsum(s_counts).astype(np.float64)
-    s_quantiles /= s_quantiles[-1]
-    t_quantiles = np.cumsum(t_counts).astype(np.float64)
-    t_quantiles /= t_quantiles[-1]
-
-    # interpolate linearly to find the pixel values in the template image
-    # that correspond most closely to the quantiles in the source image
-    interp_t_values = np.interp(s_quantiles, t_quantiles, t_values)
-
-    return interp_t_values[bin_idx].reshape(oldshape)
-    
-'''

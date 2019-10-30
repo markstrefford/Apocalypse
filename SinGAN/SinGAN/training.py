@@ -19,6 +19,10 @@ def train(opt,Gs,Zs,reals,NoiseAmp):
     while scale_num<opt.stop_scale+1:
         opt.nfc = min(opt.nfc_init * pow(2, math.floor(scale_num / 4)), 128)
         opt.min_nfc = min(opt.min_nfc_init * pow(2, math.floor(scale_num / 4)), 128)
+        if opt.fast_training:
+            if (scale_num > 0) & (scale_num % 4==0):
+                opt.niter = opt.niter//2
+
         '''
         if (scale_num == opt.stop_scale):
             opt.nfc = 128
@@ -33,7 +37,7 @@ def train(opt,Gs,Zs,reals,NoiseAmp):
 
         #plt.imsave('%s/in.png' %  (opt.out_), functions.convert_image_np(real), vmin=0, vmax=1)
         #plt.imsave('%s/original.png' %  (opt.out_), functions.convert_image_np(real_), vmin=0, vmax=1)
-        plt.imsave('%s/in_scale.png' %  (opt.outf), functions.convert_image_np(reals[scale_num]), vmin=0, vmax=1)
+        plt.imsave('%s/real_scale.png' %  (opt.outf), functions.convert_image_np(reals[scale_num]), vmin=0, vmax=1)
 
         D_curr,G_curr = init_models(opt)
         if (nfc_prev==opt.nfc):
@@ -61,110 +65,7 @@ def train(opt,Gs,Zs,reals,NoiseAmp):
         del D_curr,G_curr
     return
 
-def SR_train(opt,Gs,Zs,reals,NoiseAmp):
-    real = functions.read_image(opt)
-    scale_num = 0#opt.stop_scale
-    #real = imresize(real_,opt.scale1,opt)
-    #reals = functions.creat_reals_pyramid(real,reals,opt)
-    reals.append(real)
-    nfc_prev = 0
-    in_s = imresize(real,opt.scale_factor,opt)
-    in_s = imresize(in_s,1/opt.scale_factor,opt)
-    in_s = in_s[:,:,0:real.shape[2],0:real.shape[3]]
 
-    #while scale_num<opt.stop_scale+1:
-    opt.nfc = 128#min(opt.nfc_init * pow(2, math.floor(scale_num / 4)), 128)
-    opt.min_nfc = 128#min(opt.min_nfc_init * pow(2, math.floor(scale_num / 4)), 128)
-    '''
-    if (scale_num == opt.stop_scale):
-        opt.nfc = 128
-        opt.min_nfc = 128
-    '''
-    opt.out_ = functions.generate_dir2save(opt)
-    opt.outf = '%s/%d' % (opt.out_,scale_num)
-    try:
-        os.makedirs(opt.outf)
-    except OSError:
-            pass
-
-    #plt.imsave('%s/in.png' %  (opt.out_), functions.convert_image_np(real), vmin=0, vmax=1)
-    #plt.imsave('%s/original.png' %  (opt.out_), functions.convert_image_np(real_), vmin=0, vmax=1)
-    plt.imsave('%s/in_scale.png' %  (opt.outf), functions.convert_image_np(reals[scale_num]), vmin=0, vmax=1)
-
-    D_curr,G_curr = init_models(opt)
-    if (nfc_prev==opt.nfc):
-        G_curr.load_state_dict(torch.load('%s/%d/netG.pth' % (opt.out_,scale_num-1)))
-        D_curr.load_state_dict(torch.load('%s/%d/netD.pth' % (opt.out_,scale_num-1)))
-
-    z_curr,in_s,G_curr = train_single_scale(D_curr,G_curr,reals,Gs,Zs,in_s,NoiseAmp,opt)
-
-    G_curr = functions.reset_grads(G_curr,False)
-    G_curr.eval()
-    D_curr = functions.reset_grads(D_curr,False)
-    D_curr.eval()
-
-    Gs.append(G_curr)
-    Zs.append(z_curr)
-    NoiseAmp.append(opt.noise_amp)
-
-    torch.save(Zs, '%s/Zs.pth' % (opt.out_))
-    torch.save(Gs, '%s/Gs.pth' % (opt.out_))
-    torch.save(reals, '%s/reals.pth' % (opt.out_))
-    torch.save(NoiseAmp, '%s/NoiseAmp.pth' % (opt.out_))
-
-    scale_num+=1
-    nfc_prev = opt.nfc
-    del D_curr,G_curr
-
-    return
-
-def train_paint(opt,Gs,Zs,reals,NoiseAmp,centers,paint_inject_scale):
-    in_s = torch.full(reals[0].shape, 0, device=opt.device)
-    scale_num = 0
-    nfc_prev = 0
-
-    while scale_num<opt.stop_scale+1:
-        if scale_num!=paint_inject_scale:
-            scale_num += 1
-            nfc_prev = opt.nfc
-            continue
-        else:
-            opt.nfc = min(opt.nfc_init * pow(2, math.floor(scale_num / 4)), 128)
-            opt.min_nfc = min(opt.min_nfc_init * pow(2, math.floor(scale_num / 4)), 128)
-
-            opt.out_ = functions.generate_dir2save(opt)
-            opt.outf = '%s/%d' % (opt.out_,scale_num)
-            try:
-                os.makedirs(opt.outf)
-            except OSError:
-                    pass
-
-            #plt.imsave('%s/in.png' %  (opt.out_), functions.convert_image_np(real), vmin=0, vmax=1)
-            #plt.imsave('%s/original.png' %  (opt.out_), functions.convert_image_np(real_), vmin=0, vmax=1)
-            plt.imsave('%s/in_scale.png' %  (opt.outf), functions.convert_image_np(reals[scale_num]), vmin=0, vmax=1)
-
-            D_curr,G_curr = init_models(opt)
-
-            z_curr,in_s,G_curr = train_single_scale(D_curr,G_curr,reals[:scale_num+1],Gs[:scale_num],Zs[:scale_num],in_s,NoiseAmp[:scale_num],opt,centers=centers)
-
-            G_curr = functions.reset_grads(G_curr,False)
-            G_curr.eval()
-            D_curr = functions.reset_grads(D_curr,False)
-            D_curr.eval()
-
-            Gs[scale_num] = G_curr
-            Zs[scale_num] = z_curr
-            NoiseAmp[scale_num] = opt.noise_amp
-
-            torch.save(Zs, '%s/Zs.pth' % (opt.out_))
-            torch.save(Gs, '%s/Gs.pth' % (opt.out_))
-            torch.save(reals, '%s/reals.pth' % (opt.out_))
-            torch.save(NoiseAmp, '%s/NoiseAmp.pth' % (opt.out_))
-
-            scale_num+=1
-            nfc_prev = opt.nfc
-        del D_curr,G_curr
-    return
 
 def train_single_scale(netD,netG,reals,Gs,Zs,in_s,NoiseAmp,opt,centers=None):
 
@@ -172,7 +73,7 @@ def train_single_scale(netD,netG,reals,Gs,Zs,in_s,NoiseAmp,opt,centers=None):
     opt.nzx = real.shape[2]#+(opt.ker_size-1)*(opt.num_layer)
     opt.nzy = real.shape[3]#+(opt.ker_size-1)*(opt.num_layer)
     opt.receptive_field = opt.ker_size + ((opt.ker_size-1)*(opt.num_layer-1))*opt.stride
-    pad_noise = int(((opt.ker_size-1)*opt.num_layer)/2)
+    pad_noise = int(((opt.ker_size - 1) * opt.num_layer) / 2)
     pad_image = int(((opt.ker_size - 1) * opt.num_layer) / 2)
     if opt.mode == 'animation_train':
         opt.nzx = real.shape[2]+(opt.ker_size-1)*(opt.num_layer)
@@ -306,7 +207,7 @@ def train_single_scale(netD,netG,reals,Gs,Zs,in_s,NoiseAmp,opt,centers=None):
         z_opt2plot.append(rec_loss)
 
         if epoch % 25 == 0 or epoch == (opt.niter-1):
-            print('[%d/%d]' % (epoch, opt.niter))
+            print('scale %d:[%d/%d]' % (len(Gs), epoch, opt.niter))
 
         if epoch % 500 == 0 or epoch == (opt.niter-1):
             plt.imsave('%s/fake_sample.png' %  (opt.outf), functions.convert_image_np(fake.detach()), vmin=0, vmax=1)
@@ -358,6 +259,55 @@ def draw_concat(Gs,Zs,reals,NoiseAmp,in_s,mode,m_noise,m_image,opt):
                 #    G_z = m_image(G_z)
                 count += 1
     return G_z
+
+def train_paint(opt,Gs,Zs,reals,NoiseAmp,centers,paint_inject_scale):
+    in_s = torch.full(reals[0].shape, 0, device=opt.device)
+    scale_num = 0
+    nfc_prev = 0
+
+    while scale_num<opt.stop_scale+1:
+        if scale_num!=paint_inject_scale:
+            scale_num += 1
+            nfc_prev = opt.nfc
+            continue
+        else:
+            opt.nfc = min(opt.nfc_init * pow(2, math.floor(scale_num / 4)), 128)
+            opt.min_nfc = min(opt.min_nfc_init * pow(2, math.floor(scale_num / 4)), 128)
+
+            opt.out_ = functions.generate_dir2save(opt)
+            opt.outf = '%s/%d' % (opt.out_,scale_num)
+            try:
+                os.makedirs(opt.outf)
+            except OSError:
+                    pass
+
+            #plt.imsave('%s/in.png' %  (opt.out_), functions.convert_image_np(real), vmin=0, vmax=1)
+            #plt.imsave('%s/original.png' %  (opt.out_), functions.convert_image_np(real_), vmin=0, vmax=1)
+            plt.imsave('%s/in_scale.png' %  (opt.outf), functions.convert_image_np(reals[scale_num]), vmin=0, vmax=1)
+
+            D_curr,G_curr = init_models(opt)
+
+            z_curr,in_s,G_curr = train_single_scale(D_curr,G_curr,reals[:scale_num+1],Gs[:scale_num],Zs[:scale_num],in_s,NoiseAmp[:scale_num],opt,centers=centers)
+
+            G_curr = functions.reset_grads(G_curr,False)
+            G_curr.eval()
+            D_curr = functions.reset_grads(D_curr,False)
+            D_curr.eval()
+
+            Gs[scale_num] = G_curr
+            Zs[scale_num] = z_curr
+            NoiseAmp[scale_num] = opt.noise_amp
+
+            torch.save(Zs, '%s/Zs.pth' % (opt.out_))
+            torch.save(Gs, '%s/Gs.pth' % (opt.out_))
+            torch.save(reals, '%s/reals.pth' % (opt.out_))
+            torch.save(NoiseAmp, '%s/NoiseAmp.pth' % (opt.out_))
+
+            scale_num+=1
+            nfc_prev = opt.nfc
+        del D_curr,G_curr
+    return
+
 
 def init_models(opt):
 

@@ -32,6 +32,7 @@ def get_arguments():
 
     #optimization hyper parameters:
     parser.add_argument('--niter', type=int, default=2000, help='number of epochs to train per scale')
+    parser.add_argument('--fast_training', type=bool, help='fast training flag', default=False)
     parser.add_argument('--gamma',type=float,help='scheduler gamma',default=0.1)
     parser.add_argument('--lr_g', type=float, default=0.0005, help='learning rate, default=0.0005')
     parser.add_argument('--lr_d', type=float, default=0.0005, help='learning rate, default=0.0005')
@@ -39,24 +40,7 @@ def get_arguments():
     parser.add_argument('--Gsteps',type=int, help='Generator inner steps',default=3)
     parser.add_argument('--Dsteps',type=int, help='Discriminator inner steps',default=3)
     parser.add_argument('--lambda_grad',type=float, help='gradient penelty weight',default=0.1)
-    parser.add_argument('--alpha',type=int, help='reconstruction loss weight',default=10)
+    parser.add_argument('--alpha',type=float, help='reconstruction loss weight',default=10)
 
-    # MANIPULATIONS PARAMETERS
-    # random_samples
-    # animation
-    # SR
-    parser.add_argument('--sr_factor', type=float, help='Super resolution factor', default=4)
-    #harmonization,editing
-    parser.add_argument('--ref_dir', help='input paint dir', default='Input/Edit')
-    parser.add_argument('--ref_name', help='ref image name', default='stone_edit.png')
-    #parser.add_argument('--mask_name', help='mask image name', default='birds_mask.png')
-    parser.add_argument('--editing_start_scale', type=int, help='editing start scale', default=3)
-    #parser.add_argument('--harmonization_start_scale', type=int, help='harmonization start scale', default=0)
-    #paint2image
-    parser.add_argument('--paint_dir', help='input paint dir', default='Input/Paints')
-    parser.add_argument('--paint_name', help='paint image name', default='trees3_paint2.png')
-    parser.add_argument('--paint_start_scale', type=int, help='paint start scale', default=2)
-    parser.add_argument('--quantization_flag', type=bool, help='quantization_flag', default=True)
-    parser.add_argument('--quantization_levels', type=int, help='paint quantization levels', default=5)
-
+    
     return parser

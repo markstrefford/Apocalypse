@@ -17,7 +17,7 @@ from skimage import color
 import math
 import imageio
 import matplotlib.pyplot as plt
-from train import *
+from SinGAN.training import *
 from config import get_arguments
 
 def generate_gif(Gs,Zs,reals,NoiseAmp,opt,alpha=0.1,beta=0.9,start_scale=2,fps=10):
@@ -117,10 +117,13 @@ def SinGAN_generate(Gs,Zs,reals,NoiseAmp,opt,in_s=None,scale_v=1,scale_h=1,n=0,g
             else:
                 I_prev = images_prev[i]
                 I_prev = imresize(I_prev,1/opt.scale_factor, opt)
-                I_prev = I_prev[:,:,0:round(scale_v*reals[n].shape[2]),0:round(scale_h*reals[n].shape[3])]
-                I_prev = m(I_prev)
-                I_prev = I_prev[:,:,0:z_curr.shape[2],0:z_curr.shape[3]]
-                I_prev = functions.upsampling(I_prev,z_curr.shape[2],z_curr.shape[3])
+                if opt.mode != "SR":
+                    I_prev = I_prev[:, :, 0:round(scale_v * reals[n].shape[2]), 0:round(scale_h * reals[n].shape[3])]
+                    I_prev = m(I_prev)
+                    I_prev = I_prev[:,:,0:z_curr.shape[2],0:z_curr.shape[3]]
+                    I_prev = functions.upsampling(I_prev,z_curr.shape[2],z_curr.shape[3])
+                else:
+                    I_prev = m(I_prev)
 
             if n < gen_start_scale:
                 z_curr = Z_opt
@@ -137,46 +140,11 @@ def SinGAN_generate(Gs,Zs,reals,NoiseAmp,opt,in_s=None,scale_v=1,scale_h=1,n=0,g
                     os.makedirs(dir2save)
                 except OSError:
                     pass
-                plt.imsave('%s/%d.png' % (dir2save, i), functions.convert_image_np(I_curr.detach()), vmin=0,vmax=1)
-                #plt.imsave('%s/%d_%d.png' % (dir2save,i,n),functions.convert_image_np(I_curr.detach()), vmin=0, vmax=1)
-                #plt.imsave('%s/in_s.png' % (dir2save), functions.convert_image_np(in_s), vmin=0,vmax=1)
+                if (opt.mode != "harmonization") & (opt.mode != "editing") & (opt.mode != "SR") & (opt.mode != "paint2image"):
+                    plt.imsave('%s/%d.png' % (dir2save, i), functions.convert_image_np(I_curr.detach()), vmin=0,vmax=1)
+                    #plt.imsave('%s/%d_%d.png' % (dir2save,i,n),functions.convert_image_np(I_curr.detach()), vmin=0, vmax=1)
+                    #plt.imsave('%s/in_s.png' % (dir2save), functions.convert_image_np(in_s), vmin=0,vmax=1)
             images_cur.append(I_curr)
         n+=1
     return I_curr.detach()
 
-def SinGAN_SR(opt,Gs,Zs,reals,NoiseAmp):
-    mode = opt.mode
-    in_scale, iter_num = functions.calc_init_scale(opt)
-    opt.scale_factor = 1 / in_scale
-    opt.scale_factor_init = 1 / in_scale
-    opt.mode = 'SR_train'
-    #opt.alpha = 100
-    opt.stop_scale = 0
-    dir2trained_model = functions.generate_dir2save(opt)
-    if (os.path.exists(dir2trained_model)):
-        #print('Trained model does not exist, training SinGAN for SR')
-        Gs, Zs, reals, NoiseAmp = functions.load_trained_pyramid(opt)
-        opt.mode = mode
-    else:
-        lr_scheduler.step(opt,Gs,Zs,reals,NoiseAmp)
-        opt.mode = mode
-    print('%f' % pow(in_scale,iter_num))
-    Zs_sr = []
-    reals_sr = []
-    NoiseAmp_sr = []
-    Gs_sr = []
-    real = reals[-1] #read_image(opt)
-    for j in range(1,iter_num+1,1):
-        real_ = imresize(real,pow(1/opt.scale_factor,j),opt)
-        real_ = real_[:, :, 0:int(pow(1 / opt.scale_factor, j) * real.shape[2]),0:int(pow(1 / opt.scale_factor, j) * real.shape[3])]
-        reals_sr.append(real_)
-        Gs_sr.append(Gs[-1])
-        NoiseAmp_sr.append(NoiseAmp[-1])
-        z_opt = torch.full(real_.shape, 0, device=opt.device)
-        m = nn.ZeroPad2d(5)
-        z_opt = m(z_opt)
-        Zs_sr.append(z_opt)
-    out = SinGAN_generate(Gs_sr, Zs_sr,reals_sr,NoiseAmp_sr, opt,in_s=reals_sr[0], num_samples=1)
-    dir2save = functions.generate_dir2save(opt)
-    plt.imsave('%s.png' % (dir2save), functions.convert_image_np(out.detach()), vmin=0,vmax=1)
-    return
